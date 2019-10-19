@@ -41,7 +41,7 @@ ggplot(df1, aes(players)) +
 
 ##3d scatter plot of num_players vs. card drawn vs. lose probability
 my_cards <- 1:13
-my_players <- 1:11
+my_players <- 1:15
 library(colorRamps)
 library(scales)
 lose_probs = numeric(length(my_cards)*length(my_players))
@@ -55,4 +55,4 @@ df2 <- expand.grid(x=my_players,y=my_cards)
 df2$lose_probs <- lose_probs
 ggplot(df2, aes(x,y))+
   geom_tile(aes(fill=lose_probs))+
-  scale_fill_gradientn(colours=matlab.like(10))
+  scale_fill_gradient(low = 'dodgerblue4', high = 'violet')
