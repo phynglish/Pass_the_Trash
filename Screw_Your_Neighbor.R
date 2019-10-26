@@ -1,7 +1,11 @@
 prob_lose <- function(N=10,n=13,m=6) {
   pl <- 1
-  for (k in 1:N) {
-      pl <- pl*(4*(n - m + 1) - k)/(4*n - k)  
+  if (N == 0) {
+    pl <- 1
+  } else {
+    for (k in 1:N) {
+      pl <- pl*(4*(n - m + 1) - k)/(4*n - k) 
+    }
   }
   return(pl)
 }
@@ -15,7 +19,7 @@ lose_per_player <- function(N=52,n=13) {
 }
 
 N <- 51
-players <- 1:N
+players <- 0:N
 lose_prob <- numeric(length(players))
 for (i in 1:length(players)) {
   lose_prob[i] = lose_per_player(players[i],13)
@@ -36,18 +40,18 @@ ggplot(df1, aes(players)) +
   geom_line(aes(y=lose_prob), colour="dodgerblue4",size=2) +
   geom_point(aes(y=lose_prob2),colour="violet",size=2) +
   labs(x = "Number of other players") +
-  labs(y = "Probability of losing") +
-  xlim(1,51) + ylim(0.01, 0.59)
+  labs(y = "Probability my card is the lowest") +
+  xlim(0,51) + ylim(0, 1)
 
 ##3d scatter plot of num_players vs. card drawn vs. lose probability
 my_cards <- 1:13
-my_players <- 1:15
+my_players <- 0:15
 library(colorRamps)
 library(scales)
 lose_probs = numeric(length(my_cards)*length(my_players))
 for (j in my_cards){
   for (i in my_players){
-    lose_probs[(j - 1)*length(my_players) + i] = prob_lose(i,n=13,j)
+    lose_probs[(j - 1)*length(my_players) + i + 1] = prob_lose(i,n=13,j)
   }
 }
 
@@ -55,4 +59,8 @@ df2 <- expand.grid(x=my_players,y=my_cards)
 df2$lose_probs <- lose_probs
 ggplot(df2, aes(x,y))+
   geom_tile(aes(fill=lose_probs))+
-  scale_fill_gradient(low = 'dodgerblue4', high = 'violet')
+  scale_fill_gradient2(low = 'dodgerblue4', high = "grey45", mid = 'violet', midpoint = 0.5) +
+  labs(x = "Number of other players") +
+  labs(y = "Value of my card") +
+  scale_y_continuous(breaks = c(1, 5, 10, 13), labels = c(2, 6, expression(J), expression(A))) +
+  labs(fill = "Prob. to lose")
