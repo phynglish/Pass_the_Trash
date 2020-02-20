@@ -1,0 +1,175 @@
+---
+output: html_fragment
+---
+
+<style>
+body {
+text-align: justify}
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Pass the Trash
+
+While I was home for Christmas a few years ago, my brother's girlfriend introduced our family to a simple card game called [Screw Your Neighbor](https://plentifun.com/rules-to-play-screw-your-neighbor-card-game) (which we renamed Pass the Trash when the kids wanted to play too).
+
+The goal is pretty simple: at the end of the round, don't be the person with the lowest value card; you survive the round by not losing. Once a player loses three rounds in total, they are elminated from the game. Each round, one person deals all (remaining) players (including the dealer) one face-down card, and each player can look at their own card. Starting from the player on the dealer's left and moving clockwise, each player decides whether to keep their card or swap their card with the one in front of the player to their left. In this way, low value cards are passed around the table, and people hope to keep their face cards (we played aces high). The dealer takes the last turn of the round, and they have the choice of either keeping the card they have or swapping it with the top card of the deck (instead of the next neighbor in line). Once the dealer is finished, everyone reveals their card, and the person with the lowest card loses. In the case of a tie for lowest, all of the tied people lose.
+
+There's one more rule, which I'm going to ignore for the purposes of this post: if you have a king, you turn it face up in front of you at the start of the round. The king cannot be taken from you, and it prevents anyone from passing a card past you; it's a solid roadblock.
+
+There's a few obvious strategies: always pass a 2 or a 3; always keep a face card (if you neighbor doesn't take it from you). But what about a six? It's high enough to often not be the lowest card, but low enough that there's still a decent chance *is* the lowest. Do you pass or keep a six? And does your decision depend on the number of people playing in the round?
+
+This is a sampling-without-replacement problem, in which we draw a number of samples equal to the number of players, and we're drawing from a pool of 52 cards, with card values ranging from 1 to 13. After a bit of careful thinking, I came up with this formula for the probability that the card I'm initially dealt is the lowest card on the table (regardless of its value $m$), given the number of *other* players $N$:
+
+$$
+P(\mathrm{``I\, was\, dealt\, the\, lowest\, card\!"} \, \vert \, N) = \frac{1}{13} \sum_{m = 1}^{13} \prod_{k=1}^{N}  \frac{4\left( N - m + 1 \right) - k}{4*N - k}
+$$
+To check whether that formula was right, I also simulated the same probability with R:
+
+```{r, echo = FALSE}
+prob_lose <- function(N=10,n=13,m=6) {
+  pl <- 1
+  if (N == 0) {
+    pl <- 1
+  } else {
+    for (k in 1:N) {
+      pl <- pl*(4*(n - m + 1) - k)/(4*n - k) 
+    }
+  }
+  return(pl)
+}
+
+lose_per_player <- function(N=52,n=13) {
+  pl <- 0
+  for (m in 1:13) {
+    pl <- pl + (1/13)*prob_lose(N,n,m)
+  }
+  return(pl)
+}
+
+N <- 51
+players <- 0:N
+lose_prob <- numeric(length(players))
+for (i in 1:length(players)) {
+  lose_prob[i] = lose_per_player(players[i],13)
+}
+
+cards <- rep(1:13,4)
+```
+
+```{r, class.source = "bg-info text-info",class.output = "bg-info text-info"}
+##maximum number of other players
+N <- 51
+##list of numbers of other players
+players <- 0:N
+##initialize lose probabilities
+lose_prob2 <- numeric(length(players))
+##simulate losses
+for (i in 1:length(players)) {
+  lose_prob2[i] <- mean(replicate(1e5,which.min(sample(cards,players[i]
+   + 1,FALSE))==1))
+}
+```
+
+I've plotted both results here, which shows the probability that the card I'm initially dealt is the lowest as a function of the number of players:
+
+```{r, fig.align='center', out.width = "75%", echo = FALSE}
+library(ggplot2)
+theme_set(
+  theme_minimal() +
+    theme(legend.position = "right")
+  )
+
+df1 <- data.frame(players,lose_prob,lose_prob2)
+ggplot(df1, aes(players)) +
+  geom_hline(yintercept=1/13,linetype = "dashed",size=1.35,color="grey45") +
+  geom_line(aes(y=lose_prob), colour="dodgerblue4",size=2) +
+  geom_point(aes(y=lose_prob2),colour="violet",size=2) +
+  labs(x = "Number of other players") +
+  labs(y = "Probability my card is the lowest") +
+  xlim(0,51) + ylim(0, 1)
+```
+
+We can see that the results make sense by looking at the extreme cases: when there is one other player, and when there are 51 other players. (Naturally if the number of *other* players is 0, I'm guaranteed to lose the round.) If there's one other player, then my card will be the lowest slightly more than half the time. It's not exactly half because if we tie, we both have the lowest card. On the other hand, as the number of players increases, my probability to lose goes to 1/13 (the dashed horizontal line). This makes sense, because as soon as there are 52 *total* players, then every card in the deck has been dealt, and the probability that my initial card is lowest is the same as the probability that I'm dealt a 2 of any suit: 4/52 = 1/13.
+
+But I don't have to keep the card I'm initially dealt. When should I trade it? To answer that, I've plotted the probability that my card has the lowest value as a function of the number of players $N$ and the value $m$ of my card.
+
+```{r, fig.align='center', out.width = "75%", echo = FALSE}
+##3d scatter plot of num_players vs. card drawn vs. lose probability
+my_cards <- 1:13
+my_players <- 0:15
+library(colorRamps)
+library(scales)
+lose_probs = numeric(length(my_cards)*length(my_players))
+for (j in my_cards){
+  for (i in my_players){
+    lose_probs[(j - 1)*length(my_players) + i + 1] = prob_lose(i,n=13,j)
+  }
+}
+
+df2 <- expand.grid(x=my_players,y=my_cards)
+df2$lose_probs <- lose_probs
+ggplot(df2, aes(x,y))+
+  geom_tile(aes(fill=lose_probs))+
+  scale_fill_gradient2(low = 'dodgerblue4', high = "grey45", mid = 'violet', midpoint = 0.5) +
+  labs(x = "Number of other players") +
+  labs(y = "Value of my card") +
+  scale_y_continuous(breaks = c(1, 5, 10, 13), labels = c(2, 6, expression(Jack), expression(Ace))) +
+  labs(fill = "Prob. to lose")
+```
+
+Here we see that as the number of players increases, even low value cards have a decent chance of winning; for example, if there are 9 other players, a 4 of any suit has about an 75% chance of not being the lowest card, which is still pretty good! It also matches the intuition that for large-ish groups (5 or more players), keeping a six is pretty safe, but it's much riskier if there are only 1 or 2 other players.
+
+Now, at some point (sometime during our third game, I think), it happened that the same person lost three times in a row. And one of my cousins remarked "What are the odds!" It's my experience that "unlikely" events like that are more common than people expect. I suspect people answer the question "What are the odds that would happen to me?", instead of the question "What is the probability that would happen to someone in this group?" It's a form of the substitution fallacy, in which a difficult-to-answer question is replaced by a simpler one. I wanted to check this, though, so I simulated the probability that any one of the players would lose three times in a row. Here is the code simulating 1000 games, in which each game starts with 10 players (roughly the number of my family members that played each game). For ease of simulation, the players were stuck with whatever card they were initially dealt, so this is only a crude approximation.
+
+```{r, class.source = "bg-info text-info", class.output = "bg-info text-info"}
+#Initialize parameters
+Total_players <- 10
+N_games <- 1000
+total_losses <- matrix(0, nrow = 0, ncol = Total_players)
+three_in_a_row <- 0
+game <- 1
+
+## Simulate N_games
+while (game <= N_games) {
+  #Initialize losses, to record when a player loses
+  losses <- matrix(0, nrow = 0, ncol = Total_players) 
+  #Start of each game, current number of players
+  #equals total number of players
+  N_players <- Total_players 
+  round <- 1 #Set current round of game to 1
+  # Simulate one game, which ends when only one player remains
+  while (N_players > 1) {
+    losses <- rbind(losses,matrix(0,nrow=1,ncol=Total_players))
+    cards_this_round <- sample(cards, N_players, FALSE)
+    #Determine which player(s) lost this round
+    losers <- which(cards_this_round == min(cards_this_round)) 
+    #Add a loss to players that lost
+    losses[round,colSums(losses)<3][losers] <- 
+      losses[round,colSums(losses)<3][losers] + 1 
+    #Find number of players remaining (fewer than 3 losses)
+    N_players <- sum(colSums(losses) < 3) 
+    round <- round + 1
+  }
+  #Find whether a player lost three times in a row in this game
+  for ( i in 1:(nrow(losses)-2) ) {
+    three_in_a_row <- three_in_a_row + 
+      sum(apply(losses[i:(i+2),], 2, function(x, want)
+      isTRUE(all.equal(x, want)), c(1,1,1)))
+  }
+  game <- game + 1
+  #Keep record of all games played
+  total_losses <- rbind(total_losses,losses)
+  
+}
+
+three_in_a_row / N_games
+```
+
+With 10 starting players, there's about a 31% chance that someone will lose three times in a row in a single game. So after three complete games, there was about a 67% chance that at least one person would have lost three times in a row, which is not a small probability at all!
+
+I hope you found this post interesting, and thanks for reading!
+
+--Mark
