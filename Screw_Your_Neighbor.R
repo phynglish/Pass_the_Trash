@@ -64,3 +64,4 @@ ggplot(df2, aes(x,y))+
   labs(y = "Value of my card") +
   scale_y_continuous(breaks = c(1, 5, 10, 13), labels = c(2, 6, expression(J), expression(A))) +
   labs(fill = "Prob. to lose")
+
